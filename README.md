@@ -13,6 +13,8 @@ MQTT v3.1.1 client library for iOS/macOS/tvOS  written with Swift 5
 
 Build with Xcode 11.1 / Swift 5.1
 
+iOS Target: 10.0 or above
+
 
 ## Installation
 ### CocoaPods
@@ -21,7 +23,7 @@ Install using [CocoaPods](http://cocoapods.org) by adding this line to your Podf
 
 ```ruby
 use_frameworks! # Add this if you are targeting iOS 8+ or using Swift
-pod 'CocoaMQTT'  
+pod 'CocoaMQTT', '1.3.0-rc.2'
 ```
 
 Then, run the following command:
@@ -65,7 +67,7 @@ If you're building for iOS, tvOS:
 
 ## Usage
 
-Create a client to connect MQTT Broker:
+Create a client to connect [MQTT broker](https://www.emqx.io/products/broker):
 
 ```swift
 let clientID = "CocoaMQTT-" + String(ProcessInfo().processIdentifier)
@@ -120,6 +122,15 @@ end
 
 ```
 
+If you're using CocoaMQTT in a project with only a `.podspec` and no `Podfile`, e.g. in a module for React Native, add this line to your `.podspec`:
+
+```ruby
+Pod::Spec.new do |s|
+  ...
+  s.dependency "Starscream", "~> 3.1.1"
+end
+```
+
 Then, Create a MQTT instance over Websocket:
 
 ```swift
@@ -167,7 +178,7 @@ Then, open the `Example.xcworkspace/` by Xcode and start it!
 These third-party functions are used:
 
 * [GCDAsyncSocket](https://github.com/robbiehanson/CocoaAsyncSocket)
-* [Starscream](https://github.com/daltoniam/Starscream）
+* [Starscream](https://github.com/daltoniam/Starscream)
 
 
 ## LICENSE

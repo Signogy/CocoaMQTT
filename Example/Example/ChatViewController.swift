@@ -28,7 +28,12 @@ class ChatViewController: UIViewController {
             }
         }
     }
+
+    var mqtt5: CocoaMQTT5?
     var mqtt: CocoaMQTT?
+    var client: String?
+    var mqttVersion: String?
+
     var messages: [ChatMessage] = [] {
         didSet {
             tableView.reloadData()
@@ -55,9 +60,17 @@ class ChatViewController: UIViewController {
     }
     
     @IBAction func sendMessage() {
+
+        
         let message = messageTextView.text
-        if let client = animal {
-            mqtt!.publish("chat/room/animals/client/" + client, withString: message!, qos: .qos1)
+
+        let publishProperties = MqttPublishProperties()
+        publishProperties.contentType = "JSON"
+
+        if mqttVersion == "3.1.1" {
+            mqtt!.publish("chat/room/animals/client/" + animal!, withString: message!, qos: .qos1)
+        }else if mqttVersion == "5.0" {
+            mqtt5!.publish("chat/room/animals/client/" + animal!, withString: message!, qos: .qos1, DUP: false, retained: false, properties: publishProperties)
         }
         
         messageTextView.text = ""
@@ -66,8 +79,17 @@ class ChatViewController: UIViewController {
         messageTextView.layoutIfNeeded()
         view.endEditing(true)
     }
+
     @IBAction func disconnect() {
-        mqtt!.disconnect()
+
+        if mqttVersion == "3.1.1" {
+            mqtt!.disconnect()
+        }else if mqttVersion == "5.0" {
+            mqtt5!.disconnect()
+            //or
+            //mqtt5!.disconnect(reasonCode: CocoaMQTTDISCONNECTReasonCode.disconnectWithWillMessage, userProperties: ["userone":"hi"])
+        }
+
         _ = navigationController?.popViewController(animated: true)
     }
     
@@ -75,7 +97,14 @@ class ChatViewController: UIViewController {
         super.viewDidLoad()
         navigationController?.navigationBar.isHidden = true
         animal = tabBarController?.selectedViewController?.tabBarItem.title
-        automaticallyAdjustsScrollViewInsets = false
+
+        // automaticallyAdjustsScrollViewInsets = false
+        if #available(iOS 11.0, *) {
+            self.tableView.contentInsetAdjustmentBehavior = .never
+        } else {
+            automaticallyAdjustsScrollViewInsets = false
+        }
+
         messageTextView.delegate = self
         tableView.delegate = self
         tableView.dataSource = self
@@ -83,7 +112,15 @@ class ChatViewController: UIViewController {
         tableView.estimatedRowHeight = 50
         
         let name = NSNotification.Name(rawValue: "MQTTMessageNotification" + animal!)
-        NotificationCenter.default.addObserver(self, selector: #selector(ChatViewController.receivedMessage(notification:)), name: name, object: nil)
+
+        if mqttVersion == "3.1.1" {
+            NotificationCenter.default.addObserver(self, selector: #selector(ChatViewController.receivedMessage(notification:)), name: name, object: nil)
+        }else if mqttVersion == "5.0" {
+            NotificationCenter.default.addObserver(self, selector: #selector(ChatViewController.receivedMqtt5Message(notification:)), name: name, object: nil)
+        }
+
+        let disconnectNotification = NSNotification.Name(rawValue: "MQTTMessageNotificationDisconnect")
+        NotificationCenter.default.addObserver(self, selector: #selector(ChatViewController.disconnectMessage(notification:)), name: disconnectNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(ChatViewController.keyboardChanged(notification:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
     }
     
@@ -103,16 +140,37 @@ class ChatViewController: UIViewController {
         }
         view.layoutIfNeeded()
     }
-    
+
+
+    @objc func disconnectMessage(notification: NSNotification) {
+        disconnect()
+    }
+
+
     @objc func receivedMessage(notification: NSNotification) {
         let userInfo = notification.userInfo as! [String: AnyObject]
         let content = userInfo["message"] as! String
         let topic = userInfo["topic"] as! String
+        let id = UInt16(userInfo["id"] as! UInt16)
         let sender = topic.replacingOccurrences(of: "chat/room/animals/client/", with: "")
-        let chatMessage = ChatMessage(sender: sender, content: content)
+        let chatMessage = ChatMessage(sender: sender, content: content, id: id)
         messages.append(chatMessage)
     }
-    
+
+    @objc func receivedMqtt5Message(notification: NSNotification) {
+        let userInfo = notification.userInfo as! [String: AnyObject]
+        let message = userInfo["message"] as! String
+        let topic = userInfo["topic"] as! String
+        let id = UInt16(userInfo["id"] as! UInt16)
+        //let sender = userInfo["animal"] as! String
+        let sender = topic.replacingOccurrences(of: "chat/room/animals/client/", with: "")
+        let content = String(message.filter { !"\0".contains($0) })
+        let chatMessage = ChatMessage(sender: sender, content: content, id: id)
+        print("sendersendersender =  \(sender)")
+        messages.append(chatMessage)
+    }
+
+
     func scrollToBottom() {
         let count = messages.count
         if count > 3 {
@@ -148,15 +206,17 @@ extension ChatViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let message = messages[indexPath.row]
+        print("message.sender: \(message.sender)    animal:\(String(describing: tabBarController?.selectedViewController?.tabBarItem.title!))   message.content:\( message.content)"   )
+
         if message.sender == animal {
             let cell = tableView.dequeueReusableCell(withIdentifier: "rightMessageCell", for: indexPath) as! ChatRightMessageCell
-            cell.contentLabel.text = messages[indexPath.row].content
+            cell.contentLabel.text = message.content
             cell.avatarImageView.image = UIImage(named: animal!)
             return cell
         } else {
             let cell = tableView.dequeueReusableCell(withIdentifier: "leftMessageCell", for: indexPath) as! ChatLeftMessageCell
-            cell.contentLabel.text = messages[indexPath.row].content
-            cell.avatarImageView.image = UIImage(named: message.sender)
+            cell.contentLabel.text = message.content
+            cell.avatarImageView.image = UIImage(named: "other")
             return cell
         }
     }

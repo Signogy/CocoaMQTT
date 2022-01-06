@@ -1,29 +1,32 @@
 # CocoaMQTT
 
-![PodVersion](https://img.shields.io/cocoapods/v/CocoaMQTT.svg)
-![Platforms](https://img.shields.io/cocoapods/p/CocoaMQTT.svg)
+![PodVersion](https://img.shields.io/cocoapods/v/CocoaMQTT5.svg)
+![Platforms](https://img.shields.io/cocoapods/p/CocoaMQTT5.svg)
 ![License](https://img.shields.io/cocoapods/l/BadgeSwift.svg?style=flat)
 ![Swift version](https://img.shields.io/badge/swift-5-orange.svg)
-[![Coverage Status](https://coveralls.io/repos/github/emqx/CocoaMQTT/badge.svg?branch=master)](https://coveralls.io/github/emqx/CocoaMQTT?branch=master)
 
-MQTT v3.1.1 client library for iOS/macOS/tvOS  written with Swift 5
+MQTT v3.1.1 and v5.0 client library for iOS/macOS/tvOS written with Swift 5
 
 
 ## Build
 
 Build with Xcode 11.1 / Swift 5.1
 
-iOS Target: 10.0 or above
-
+IOS Target: 9.0 or above
+OSX Target: 10.12 or above
+TVOS Target: 10.0 or above
 
 ## Installation
 ### CocoaPods
 
-Install using [CocoaPods](http://cocoapods.org) by adding this line to your Podfile:
+To integrate CocoaMQTT into your Xcode project using [CocoaPods](http://cocoapods.org), you need to modify you `Podfile` like the followings:
 
 ```ruby
-use_frameworks! # Add this if you are targeting iOS 8+ or using Swift
-pod 'CocoaMQTT', '1.3.0-rc.2'
+use_frameworks!
+
+target 'Example' do
+    pod 'CocoaMQTT'
+end
 ```
 
 Then, run the following command:
@@ -31,6 +34,13 @@ Then, run the following command:
 ```bash
 $ pod install
 ```
+
+At last, import "CocoaMQTT" to your project:
+
+```swift
+import CocoaMQTT
+```
+
 
 ### Carthage
 Install using [Carthage](https://github.com/Carthage/Carthage) by adding the following lines to your Cartfile:
@@ -42,34 +52,39 @@ github "emqx/CocoaMQTT" "master"
 Then, run the following command:
 
 ```bash
-$ carthage update --platform iOS,macOS,tvOS
+$ carthage update --platform iOS,macOS,tvOS --use-xcframeworks
 ```
 
-Last if you're building for OS X:
+At last:
 
-- On your application targets “General” settings tab, in the "Embedded Binaries" section, drag and drop CocoaMQTT.framework from the Carthage/Build/Mac folder on disk.
+On your application targets “General” settings tab, in the "Frameworks, Libraries, and Embedded content" section, drag and drop CocoaMQTT.xcframework, CocoaAsyncSocket.xcframework and Starscream.xcframework from the Carthage/Build folder on disk. Then select "Embed & Sign". 
 
-If you're building for iOS, tvOS:
 
-- On your application targets “General” settings tab, in the "Linked Frameworks and Libraries" section, drag and drop each framework you want to use from the Carthage/Build folder on disk.
-
-- On your application targets "Build Phases" settings tab, click the "+" icon and choose "New Run Script Phase". Create a Run Script with the following contents: 
-
-    ```
-    /usr/local/bin/carthage copy-frameworks
-    ```
-
-- and add the paths to the frameworks you want to use under "Input Files", e.g.:
-
-    ```
-    $(SRCROOT)/Carthage/Build/iOS/CocoaMQTT.framework
-    ```
 
 ## Usage
 
 Create a client to connect [MQTT broker](https://www.emqx.io/products/broker):
 
 ```swift
+///MQTT 5.0
+let clientID = "CocoaMQTT-" + String(ProcessInfo().processIdentifier)
+let mqtt5 = CocoaMQTT5(clientID: clientID, host: "localhost", port: 1883)
+
+let connectProperties = MqttConnectProperties()
+connectProperties.topicAliasMaximum = 0
+connectProperties.sessionExpiryInterval = 0
+connectProperties.receiveMaximum = 100
+connectProperties.maximumPacketSize = 500
+mqtt5.connectProperties = connectProperties
+
+mqtt5.username = "test"
+mqtt5.password = "public"
+mqtt5.willMessage = CocoaMQTTWill(topic: "/will", message: "dieout")
+mqtt5.keepAlive = 60
+mqtt5.delegate = self
+mqtt5.connect()
+
+///MQTT 3.1.1
 let clientID = "CocoaMQTT-" + String(ProcessInfo().processIdentifier)
 let mqtt = CocoaMQTT(clientID: clientID, host: "localhost", port: 1883)
 mqtt.username = "test"
@@ -84,7 +99,7 @@ Now you can use closures instead of `CocoaMQTTDelegate`:
 
 ```swift 
 mqtt.didReceiveMessage = { mqtt, message, id in
-	print("Message received in topic \(message.topic) with payload \(message.string!)")           
+    print("Message received in topic \(message.topic) with payload \(message.string!)")           
 }
 ```
 
@@ -134,13 +149,24 @@ end
 Then, Create a MQTT instance over Websocket:
 
 ```swift
+///MQTT 5.0
+let websocket = CocoaMQTTWebSocket(uri: "/mqtt")
+let mqtt5 = CocoaMQTT5(clientID: clientID, host: host, port: 8083, socket: websocket)
+let connectProperties = MqttConnectProperties()
+connectProperties.topicAliasMaximum = 0
+// ...
+mqtt5.connectProperties = connectProperties
+// ...
+
+_ = mqtt5.connect()
+
+///MQTT 3.1.1
 let websocket = CocoaMQTTWebSocket(uri: "/mqtt")
 let mqtt = CocoaMQTT(clientID: clientID, host: host, port: 8083, socket: websocket)
 
 // ...
 
 _ = mqtt.connect()
-
 ```
 
 If you want to add additional custom header to the connection, you can use the following:
@@ -178,7 +204,7 @@ Then, open the `Example.xcworkspace/` by Xcode and start it!
 These third-party functions are used:
 
 * [GCDAsyncSocket](https://github.com/robbiehanson/CocoaAsyncSocket)
-* [Starscream](https://github.com/daltoniam/Starscream)
+* [Starscream](https://github.com/daltoniam/Starscream）
 
 
 ## LICENSE
@@ -199,6 +225,7 @@ MIT License (see `LICENSE`)
 - Feng Lee <feng@emqx.io>
 - CrazyWisdom <zh.whong@gmail.com>
 - Alex Yu <alexyu.dc@gmail.com>
+- Leeway <leeway1208@gmail.com>
 
 
 ## Twitter
